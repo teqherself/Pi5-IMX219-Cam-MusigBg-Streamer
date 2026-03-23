@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 ---------------------------------------------------------
- 8.7.29-genbot-gaussian-sigbusfix + MESH OVERLAY + STALL FIX
+ 8.7.29-gaussian-sigbusfix + MESH OVERLAY + STALL FIX
 
- LOFI STREAMER — GENBOT IMX219 FIFO LTS
+ LOFI STREAMER — IMX219 FIFO LTS
  GENDEMIK DIGITAL
 ---------------------------------------------------------
 
@@ -41,7 +41,7 @@ from picamera2.outputs import FileOutput
 
 # ===================== CONFIG =====================
 
-VERSION = "8.7.29-genbot-imx219-fifo-lts-gaussian-sigbusfix-mesh-watchdog"
+VERSION = "8.7.29-imx219-fifo-lts-gaussian-sigbusfix-mesh-watchdog"
 
 WIDTH = 1280
 HEIGHT = 720
