@@ -1,33 +1,36 @@
-# GENDEMIK DIGITAL
+# Lofi Streamer (IMX219 FIFO LTS)
 
-## LOFI STREAMER — GENBOT IMX219 FIFO LTS
-
-**Release Candidate (RC) — v8.7.29**
+**Release Candidate v8.7.29**
 
 ---
 
-## 1. Overview
+## Overview
 
-The **GENBOT LOFI STREAMER (RC v8.7.29)** is a production-ready, long-duration RTMP streaming system designed for **continuous 24/7 operation** on Raspberry Pi hardware.
+Lofi Streamer is a **resilient RTMP streaming application** designed for continuous, unattended operation on Raspberry Pi systems using the libcamera stack.
 
-This release candidate focuses on:
-
-* Stability over extended uptime
-* Deterministic video/audio pipeline behaviour
-* Automatic recovery from runtime faults
-* Safe overlay rendering using atomic file operations
+It provides a deterministic media pipeline with integrated fault recovery, ensuring stable long-duration streaming to platforms such as YouTube or Restream.
 
 ---
 
-## 2. System Architecture
+## Core Capabilities
+
+* Continuous 24/7 streaming operation
+* Deterministic video and audio pipelines
+* Automatic recovery from stream stalls and failures
+* Safe overlay rendering using atomic file updates
+* FIFO-based separation of capture and encoding stages
+
+---
+
+## Architecture
 
 ```
-Picamera2 (IMX219)
+Camera (Picamera2 / libcamera)
         │
         ▼
 H264 FIFO (/tmp/camfifo.h264)
 
-MP3 Playlist
+Audio Source (MP3 Playlist)
         │
         ▼
 PCM FIFO (/tmp/lofi_audio.pcm)
@@ -37,91 +40,74 @@ PCM FIFO (/tmp/lofi_audio.pcm)
  (composition + encoding)
 
         ▼
-      RTMP
- (YouTube / Restream)
+      RTMP Output
 ```
 
 ---
 
-## 3. Key Features
+## Features
 
-### Video Pipeline
+### Video
 
-* Resolution: **1280×720**
-* Frame rate: **25 FPS (CFR)**
-* Encoder: **libx264 (baseline profile)**
-* Stable GOP structure (2 seconds)
+* 1280×720 resolution
+* 25 FPS constant frame rate
+* H264 encoding (libx264 baseline profile)
+* Fixed GOP structure (2 seconds)
 
-### Audio Pipeline
+### Audio
 
 * MP3 playlist ingestion
 * Real-time PCM conversion
-* Continuous playback with seamless transitions
+* Continuous playback
 
-### Overlay System
+### Overlays
 
-* Timestamp (top-left)
-* Now Playing (bottom-right)
-* Mesh Chat (bottom-left)
-* PNG Logo (top-right)
+* Timestamp
+* Now Playing
+* Optional mesh/chat text
+* Static logo
 * Gaussian blur region
 
-All overlays use **atomic file replacement** to prevent FFmpeg memory faults.
+All overlays are written using atomic file replacement to prevent memory faults in FFmpeg.
 
 ---
 
-## 4. Stability Improvements (RC)
+## Stability Mechanisms
 
-* Eliminates FFmpeg **SIGBUS crashes**
-* Prevents **stderr pipe blocking**
-* Adds **FFmpeg progress monitoring**
-* Automatic pipeline restart
-* Network loss recovery
-* FIFO resilience improvements
+This release introduces key reliability improvements:
 
----
+* Prevention of FFmpeg SIGBUS errors from text overlays
+* Removal of stderr pipe blocking conditions
+* FFmpeg progress monitoring using `-progress` output
+* Automatic restart on:
 
-## 5. Dashboard (In Development)
-
-A **standalone Flask-based dashboard** is currently in development.
-
-### Planned Features
-
-* Stream status + system metrics
-* Start / Stop / Restart controls
-* Live logs
-* Network diagnostics
-* Overlay + config editor
-* Meshtastic integration
-* AI interaction layer
-
-> The dashboard is optional and **not required for operation**.
+  * encoder stall
+  * process exit
+  * network loss
+* FIFO integrity handling
 
 ---
 
-## 6. Supported Camera Hardware
+## Supported Hardware
 
-### ✅ Fully Supported (Tested & Stable)
+### Supported Cameras (libcamera / Picamera2)
 
-| Camera             | Status         | Notes                      |
-| ------------------ | -------------- | -------------------------- |
-| IMX219 (Camera v2) | ✅ LTS BASELINE | Primary reference hardware |
-| IMX477 (HQ Camera) | ✅ Supported    | Minor tuning recommended   |
-| IMX708 (Camera v3) | ✅ Supported    | Autofocus optional         |
-| OV5647 (v1 Camera) | ✅ Supported    | Legacy support             |
+| Camera | Status                               |
+| ------ | ------------------------------------ |
+| IMX219 | Fully supported (reference platform) |
+| IMX477 | Supported                            |
+| IMX708 | Supported                            |
+| OV5647 | Supported                            |
 
----
+### Unsupported
 
-### ⚠️ Not Supported (Current Build)
-
-| Camera Type               | Status          | Reason                   |
-| ------------------------- | --------------- | ------------------------ |
-| USB Webcam                | ❌ Not supported | Uses V4L2, not Picamera2 |
-| CSI non-libcamera devices | ❌               | Incompatible pipeline    |
+| Device      | Reason                                 |
+| ----------- | -------------------------------------- |
+| USB webcams | Not compatible with Picamera2 pipeline |
 
 ---
 
-## 7. Camera Configuration (Current)
+## Default Camera Configuration
 
 ```python
 cfg = cam.create_video_configuration(
@@ -135,50 +121,40 @@ cfg = cam.create_video_configuration(
 
 ### Behaviour
 
-* Auto Exposure: Enabled
-* Auto Gain: Enabled
-* Auto White Balance: Enabled
-* Format: YUV420 (Rec709)
+* Auto exposure enabled
+* Auto gain enabled
+* Auto white balance enabled
+* Rec709 colour space
 
 ---
 
-## 8. Adapting for Other Cameras
+## Configuration and Adaptation
 
-### 🔧 IMX477 (HQ Camera)
+### Resolution
 
-Recommended changes:
+Default:
 
 ```python
-main={"size": (1280, 720), "format": "YUV420"}
+(1280, 720)
 ```
 
-Optional tuning:
+Optional 1080p:
 
 ```python
-controls={
-    "FrameRate": 25,
-    "AwbEnable": True,
-    "AnalogueGain": 1.5,
-}
+(1920, 1080)
 ```
 
----
-
-### 🔧 IMX708 (Camera Module 3)
-
-Optional autofocus enable:
+Bitrate adjustment required:
 
 ```python
-controls={
-    "FrameRate": 25,
-    "AwbEnable": True,
-    "AfMode": 2,
-}
+VIDEO_BITRATE = "4000k"
+VIDEO_MAXRATE = "5000k"
+VIDEO_BUFSIZE = "8000k"
 ```
 
 ---
 
-### 🔧 Low Light Optimisation (All Cameras)
+### Low-Light Adjustment (Optional)
 
 ```python
 controls={
@@ -191,42 +167,33 @@ controls={
 
 ---
 
-### 🔧 Higher Resolution Mode
+### Camera Variants
 
-```python
-main={"size": (1920, 1080), "format": "YUV420"}
-```
-
-⚠️ Requires bitrate adjustment:
-
-```python
-VIDEO_BITRATE = "4000k"
-VIDEO_MAXRATE = "5000k"
-VIDEO_BUFSIZE = "8000k"
-```
+* IMX477: may require reduced gain for noise control
+* IMX708: optional autofocus configuration
+* OV5647: lower performance expected
 
 ---
 
-## 9. System Requirements
-
-### Hardware
+## System Requirements
 
 * Raspberry Pi 4 or 5
-* IMX219 or supported camera
-* Stable network
-
-### OS
-
 * Raspberry Pi OS (Bookworm)
+* libcamera-compatible camera module
+* Stable network connection
 
 ---
 
-## 10. Installation
+## Installation
+
+### System Packages
 
 ```bash
 sudo apt update
 sudo apt install -y ffmpeg python3-venv python3-libcamera libcamera-apps
 ```
+
+### Python Environment
 
 ```bash
 python3 -m venv ~/lofi-venv
@@ -236,43 +203,67 @@ pip install picamera2
 
 ---
 
-## 11. Project Setup
+## Project Layout
+
+```
+~/LofiStream/
+├── Servers/
+│   └── lofi-streamer.py
+├── Sounds/
+│   └── *.mp3
+├── Logo/
+│   └── picam.png
+├── Logs/
+│   └── ffmpeg-stream.log
+├── stream_url.txt
+```
+
+---
+
+## Stream Configuration
+
+Example:
+
+```
+rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+```
+
+---
+
+## Execution
 
 ```bash
-mkdir -p ~/LofiStream/{Servers,Sounds,Logo,Logs}
-```
-
-Place:
-
-* `lofi-streamer.py` → Servers
-* `.mp3` files → Sounds
-* `picam.png` → Logo
-* `stream_url.txt` → root
-
----
-
-## 12. Stream Configuration
-
-```
-rtmp://a.rtmp.youtube.com/live2/YOUR_KEY
+cd ~/LofiStream/Servers
+source ~/lofi-venv/bin/activate
+python3 lofi-streamer.py
 ```
 
 ---
 
-## 13. systemd Service
+## Service Deployment (systemd)
+
+```
+/etc/systemd/system/lofi-streamer.service
+```
 
 ```ini
 [Unit]
-Description=GENBOT LTS Lofi Streamer (IMX219 FIFO)
+Description=Lofi Streamer (IMX219 FIFO)
 After=network-online.target
 
 [Service]
-User=woo
+User=pi
 Group=video
-WorkingDirectory=/home/woo/LofiStream/Servers
-ExecStart=/home/woo/lofi-venv/bin/python3 /home/woo/LofiStream/Servers/lofi-streamer.py
+WorkingDirectory=/home/pi/LofiStream/Servers
+ExecStart=/home/pi/lofi-venv/bin/python3 /home/pi/LofiStream/Servers/lofi-streamer.py
+
 Restart=always
 RestartSec=5
+
+KillMode=control-group
+TimeoutStopSec=120
+
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
@@ -280,55 +271,54 @@ WantedBy=multi-user.target
 
 ---
 
-## 14. Monitoring
+## Monitoring
 
 ```bash
-journalctl -u woobot-streamer -f
+journalctl -u lofi-streamer -f
+```
+
+Log file:
+
+```
+~/LofiStream/Logs/ffmpeg-stream.log
 ```
 
 ---
 
-## 15. Encoding Configuration
+## Runtime Files
 
-| Parameter  | Value    |
-| ---------- | -------- |
-| Resolution | 1280×720 |
-| FPS        | 25       |
-| GOP        | 50       |
-| Bitrate    | 2600k    |
-| Audio      | AAC 128k |
-
----
-
-## 16. Known Limitations
-
-* Low-light noise (sensor gain)
-* No HDR
-* USB cameras unsupported
+```
+/tmp/
+├── camfifo.h264
+├── lofi_audio.pcm
+├── timestamp.txt
+├── nowplaying.txt
+├── mesh-chat.txt
+├── ffmpeg-progress.txt
+```
 
 ---
 
-## 17. Release Status
+## Known Limitations
 
-**Release Candidate**
-
-* Stable for extended runtime testing
-* Suitable for production validation
-
----
-
-## 18. Future Enhancements
-
-* Multi-camera support
-* Dashboard integration
-* Exposure profiles
-* Overlay UI
+* Low-light noise due to sensor gain
+* No HDR processing
+* No USB camera support
 
 ---
 
-## 19. Support Notes
+## Release Status
 
-Before deployment:
+Release Candidate
+
+This version is suitable for:
+
+* extended runtime validation
+* controlled production deployment
+
+---
+
+## Validation
 
 ```bash
 python3 -m py_compile lofi-streamer.py
@@ -336,4 +326,10 @@ python3 -m py_compile lofi-streamer.py
 
 ---
 
-**GENDEMIK DIGITAL — Streaming Systems Engineering**
+## Notes
+
+* Designed for stability over feature complexity
+* Avoid structural changes in production deployments
+* Apply incremental updates only
+
+---
