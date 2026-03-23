@@ -64,7 +64,7 @@ PCM FIFO (/tmp/lofi_audio.pcm)
 * Now Playing (bottom-right)
 * Mesh Chat (bottom-left)
 * PNG Logo (top-right)
-* Gaussian blur region for protected UI zones
+* Gaussian blur region
 
 All overlays use **atomic file replacement** to prevent FFmpeg memory faults.
 
@@ -72,85 +72,161 @@ All overlays use **atomic file replacement** to prevent FFmpeg memory faults.
 
 ## 4. Stability Improvements (RC)
 
-This release introduces critical fixes for long-term reliability:
-
-* Eliminates FFmpeg **SIGBUS crashes** from text overlays
-* Prevents **stderr pipe blocking** (long uptime freeze)
+* Eliminates FFmpeg **SIGBUS crashes**
+* Prevents **stderr pipe blocking**
 * Adds **FFmpeg progress monitoring**
-* Implements **automatic pipeline restart**
-* Detects and recovers from:
-
-  * RTMP disconnects
-  * network loss
-  * stalled encoding output
-* Improves FIFO handling and thread queue resilience
+* Automatic pipeline restart
+* Network loss recovery
+* FIFO resilience improvements
 
 ---
 
 ## 5. Dashboard (In Development)
 
-A **standalone web-based dashboard** is currently in active development as part of the GENBOT ecosystem.
+A **standalone Flask-based dashboard** is currently in development.
 
-### Planned Capabilities
+### Planned Features
 
-* Real-time streamer status (CPU, RAM, uptime, temperature)
-* Service control (start / stop / restart)
-* Live log viewing (FFmpeg + systemd)
+* Stream status + system metrics
+* Start / Stop / Restart controls
+* Live logs
 * Network diagnostics
-* Stream configuration editor
-* Overlay management (Now Playing / Mesh / text)
-* Meshtastic integration (chat + node status)
-* AI-assisted interaction layer
+* Overlay + config editor
+* Meshtastic integration
+* AI interaction layer
 
-### Architecture
-
-* Flask-based web application
-* Runs independently from the streamer process
-* Communicates via:
-
-  * systemd service state
-  * local files (`/tmp/*.txt`)
-  * system metrics (psutil)
-
-### Design Goals
-
-* Non-breaking: dashboard failure must **never interrupt streaming**
-* Appliance-style UI (clean, always-on display)
-* Remote access capable (LAN / secure WAN)
-
-> ⚠️ The dashboard is not required for operation and is **not included in this release candidate**.
-> The streamer is fully standalone and production-capable without it.
+> The dashboard is optional and **not required for operation**.
 
 ---
 
-## 6. System Requirements
+## 6. Supported Camera Hardware
+
+### ✅ Fully Supported (Tested & Stable)
+
+| Camera             | Status         | Notes                      |
+| ------------------ | -------------- | -------------------------- |
+| IMX219 (Camera v2) | ✅ LTS BASELINE | Primary reference hardware |
+| IMX477 (HQ Camera) | ✅ Supported    | Minor tuning recommended   |
+| IMX708 (Camera v3) | ✅ Supported    | Autofocus optional         |
+| OV5647 (v1 Camera) | ✅ Supported    | Legacy support             |
+
+---
+
+### ⚠️ Not Supported (Current Build)
+
+| Camera Type               | Status          | Reason                   |
+| ------------------------- | --------------- | ------------------------ |
+| USB Webcam                | ❌ Not supported | Uses V4L2, not Picamera2 |
+| CSI non-libcamera devices | ❌               | Incompatible pipeline    |
+
+---
+
+## 7. Camera Configuration (Current)
+
+```python
+cfg = cam.create_video_configuration(
+    main={"size": (1280, 720), "format": "YUV420"},
+    controls={
+        "FrameRate": 25,
+        "AwbEnable": True,
+    },
+)
+```
+
+### Behaviour
+
+* Auto Exposure: Enabled
+* Auto Gain: Enabled
+* Auto White Balance: Enabled
+* Format: YUV420 (Rec709)
+
+---
+
+## 8. Adapting for Other Cameras
+
+### 🔧 IMX477 (HQ Camera)
+
+Recommended changes:
+
+```python
+main={"size": (1280, 720), "format": "YUV420"}
+```
+
+Optional tuning:
+
+```python
+controls={
+    "FrameRate": 25,
+    "AwbEnable": True,
+    "AnalogueGain": 1.5,
+}
+```
+
+---
+
+### 🔧 IMX708 (Camera Module 3)
+
+Optional autofocus enable:
+
+```python
+controls={
+    "FrameRate": 25,
+    "AwbEnable": True,
+    "AfMode": 2,
+}
+```
+
+---
+
+### 🔧 Low Light Optimisation (All Cameras)
+
+```python
+controls={
+    "FrameRate": 25,
+    "AwbEnable": True,
+    "ExposureTime": 30000,
+    "AnalogueGain": 3.0,
+}
+```
+
+---
+
+### 🔧 Higher Resolution Mode
+
+```python
+main={"size": (1920, 1080), "format": "YUV420"}
+```
+
+⚠️ Requires bitrate adjustment:
+
+```python
+VIDEO_BITRATE = "4000k"
+VIDEO_MAXRATE = "5000k"
+VIDEO_BUFSIZE = "8000k"
+```
+
+---
+
+## 9. System Requirements
 
 ### Hardware
 
-* Raspberry Pi 4 or 5 (recommended)
-* IMX219 camera module
-* Stable network connection (Ethernet recommended)
+* Raspberry Pi 4 or 5
+* IMX219 or supported camera
+* Stable network
 
 ### OS
 
 * Raspberry Pi OS (Bookworm)
 
-### Software
+---
+
+## 10. Installation
 
 ```bash
 sudo apt update
-sudo apt install -y \
-  ffmpeg \
-  python3-pip \
-  python3-venv \
-  python3-libcamera \
-  libcamera-apps \
-  git
+sudo apt install -y ffmpeg python3-venv python3-libcamera libcamera-apps
 ```
-
----
-
-## 7. Python Environment Setup
 
 ```bash
 python3 -m venv ~/lofi-venv
@@ -160,73 +236,43 @@ pip install picamera2
 
 ---
 
-## 8. Installation
+## 11. Project Setup
 
 ```bash
 mkdir -p ~/LofiStream/{Servers,Sounds,Logo,Logs}
-cd ~/LofiStream
 ```
 
-### Required Files
+Place:
 
-| File               | Location                      |
-| ------------------ | ----------------------------- |
-| `lofi-streamer.py` | `~/LofiStream/Servers/`       |
-| MP3 files          | `~/LofiStream/Sounds/`        |
-| Logo image         | `~/LofiStream/Logo/picam.png` |
-| Stream URL         | `~/LofiStream/stream_url.txt` |
+* `lofi-streamer.py` → Servers
+* `.mp3` files → Sounds
+* `picam.png` → Logo
+* `stream_url.txt` → root
 
 ---
 
-## 9. Stream Configuration
-
-```bash
-nano ~/LofiStream/stream_url.txt
-```
-
-Example:
+## 12. Stream Configuration
 
 ```
-rtmp://a.rtmp.youtube.com/live2/YOUR_STREAM_KEY
+rtmp://a.rtmp.youtube.com/live2/YOUR_KEY
 ```
 
 ---
 
-## 10. Running (Manual Test)
+## 13. systemd Service
 
-```bash
-cd ~/LofiStream/Servers
-source ~/lofi-venv/bin/activate
-python3 lofi-streamer.py
-```
-
----
-
-## 11. systemd Service Setup
-
-```bash
-sudo nano /etc/systemd/system/woobot-streamer.service
-```
-
-```
+```ini
 [Unit]
 Description=GENBOT LTS Lofi Streamer (IMX219 FIFO)
 After=network-online.target
-Wants=network-online.target
 
 [Service]
 User=woo
 Group=video
 WorkingDirectory=/home/woo/LofiStream/Servers
 ExecStart=/home/woo/lofi-venv/bin/python3 /home/woo/LofiStream/Servers/lofi-streamer.py
-
 Restart=always
 RestartSec=5
-
-KillMode=control-group
-TimeoutStopSec=120
-
-Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
@@ -234,41 +280,10 @@ WantedBy=multi-user.target
 
 ---
 
-## 12. Enable & Start
-
-```bash
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-sudo systemctl enable woobot-streamer
-sudo systemctl start woobot-streamer
-```
-
----
-
-## 13. Monitoring
+## 14. Monitoring
 
 ```bash
 journalctl -u woobot-streamer -f
-```
-
-Log file:
-
-```
-~/LofiStream/Logs/ffmpeg-stream.log
-```
-
----
-
-## 14. Runtime Files
-
-```
-/tmp/
-├── camfifo.h264
-├── lofi_audio.pcm
-├── timestamp.txt
-├── nowplaying.txt
-├── mesh-chat.txt
-├── ffmpeg-progress.txt
 ```
 
 ---
@@ -281,57 +296,43 @@ Log file:
 | FPS        | 25       |
 | GOP        | 50       |
 | Bitrate    | 2600k    |
-| Maxrate    | 3400k    |
-| Buffer     | 6800k    |
 | Audio      | AAC 128k |
 
 ---
 
-## 16. Camera Behaviour
+## 16. Known Limitations
 
-* Auto Exposure: Enabled
-* Auto Gain: Enabled
-* Auto White Balance: Enabled
-* Format: YUV420 (Rec709)
-
----
-
-## 17. Known Limitations
-
-* Increased noise in low-light conditions
-* No HDR processing
-* Dependent on RTMP ingest stability
+* Low-light noise (sensor gain)
+* No HDR
+* USB cameras unsupported
 
 ---
 
-## 18. Release Status
+## 17. Release Status
 
 **Release Candidate**
 
-* Stable for long-duration testing
+* Stable for extended runtime testing
 * Suitable for production validation
-* Pending final LTS lock
 
 ---
 
-## 19. Future Enhancements
+## 18. Future Enhancements
 
-* Dynamic exposure profiles (day/night)
-* Dashboard integration (see Section 5)
-* Overlay configuration UI
-* Telemetry and health metrics
+* Multi-camera support
+* Dashboard integration
+* Exposure profiles
+* Overlay UI
 
 ---
 
-## 20. Support & Maintenance
+## 19. Support Notes
 
-* Validate changes before deployment:
+Before deployment:
 
-  ```bash
-  python3 -m py_compile lofi-streamer.py
-  ```
-* Avoid structural pipeline changes in production
-* Apply incremental updates only
+```bash
+python3 -m py_compile lofi-streamer.py
+```
 
 ---
 
