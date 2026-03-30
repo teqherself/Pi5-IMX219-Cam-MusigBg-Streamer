@@ -1,4 +1,4 @@
-# Lofi Streamer (IMX219 FIFO LTS)
+# Lofi Streamer (IMX219 FIFO LTS - meshatstic)
 
 **Release Candidate v8.7.29**
 
