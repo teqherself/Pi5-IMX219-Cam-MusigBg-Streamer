@@ -10,6 +10,8 @@ Lofi Streamer is a **resilient RTMP streaming application** designed for continu
 
 It provides a deterministic media pipeline with integrated fault recovery, ensuring stable long-duration streaming to platforms such as YouTube or Restream.
 
+This version has a pickup for a custom meshtatstic intergration that i am running on PICAM MCR yt channel. We can basically stamp a text into the live feed via a preset meshtastic channel.
+
 ---
 
 ## Core Capabilities
